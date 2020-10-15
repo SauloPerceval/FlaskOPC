@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style type="text/css">
+            body {
+                font-family: "Courier New", sans-serif;
+                box-sizing: border-box;
+            }
+            .buttons {
+                font-size: 4em;
+            }
+            .dot {
+                height: 25px;
+                width: 25px;
+                background-color: #bbb;
+                border-radius: 50%;
+            }
+            .box {
+                width: 100px;
+                height: 50px;
+                border: 1px solid #000;
+                display: inline-block;
+            }
+            .box-title{
+                border-bottom: double;
+                text-align: center;
+                font-weight: bold;
+            }
+        </style>
+    </head>
+    <body>
+        <div style="align-items: center; justify-content: center;">
+            <div style="align-items: center; margin-top: 10px; margin-left: 20px; float: right;">
+                <!-- Elemento do timer -->
+                <div class="box">
+                    <div class="box-title">Timer</div>
+                    <div id= "timer" style="text-align: left;"></div>
+                </div>
+                <!-- Elemento do Relógio -->
+                <div class="box">
+                    <div class="box-title">Relógio</div>
+                    <div id= "clock" style="text-align: center;"></div>
+                </div>
+            </div>
+            <!-- Elemento do botao de liga e desliga -->
+            <div class="buttons" style="width: min-content; display: inline-block;">
+                <button id="on_off_button" type="button"></button>
+            </div>
+            <!-- Elemento do indicador de motor ligado -->
+            <span class="dot" id="on_off_probe" style="display: inline-block;"></span>
+            <!-- Caixa de texto do tempo de transicao do timer -->
+            <form style="width: fit-content;">
+                <div style="width: fit-content;">Valor do timer (s)</div>
+                <input id="timerValue" value="" style="width: fit-content;"></input>
+                <button id="updateTimerButton" style="width: fit-content;" onclick="updateTimerValue()">Atualizar</button>
+            </form>
+        </div>
+        <!-- Elemento do diagrama da partida estrela-triangulo -->
+        <div style="margin-left: 50px;">
+            <object id="svgObject" data="{{url_for('static', filename='star_delta.svg')}}" type="image/svg+xml"></object>
+        </div>
+    <script>
+        var button = document.getElementById("on_off_button");
+        var request = new XMLHttpRequest();
+
+        button.onclick = function(){
+            // Realiza um POST no endpoint api/ProcessSimulator1.1/items no clique do botao de liga/desliga
+            request.open("post", {{ url_for('api.post_items_value', server="ProcessSimulator1.1") | tojson }});
+            request.setRequestHeader('Content-Type', 'application/json', false);
+            // Atualiza o valor do item Connection1.INB0_0 por meio do POST
+            if (on_off_switch){
+                request.send(JSON.stringify({"Connection1.INB0_0": false}));
+            } else{
+                request.send(JSON.stringify({"Connection1.INB0_0": true}));
+            }
+        }
+
+        function updateTimerValue(){
+            // Realiza um POST no endpoint api/ProcessSimulator1.1/items no clique do botao de Atualizar
+            timer_value = document.getElementById("timerValue");
+
+            request.open("post", {{ url_for('api.post_items_value', server="ProcessSimulator1.1") | tojson }});
+            request.setRequestHeader('Content-Type', 'application/json', false);
+            // Atualiza o valor do item Connection1.MEMDW1 por meio do POST
+            request.send(JSON.stringify({"Connection1.MEMDW1": timer_value.value*1000}));
+        }
+
+        window.onload = function(){
+            // Redmensiona o diagrama de acorod 
+
+            mySVG = document.getElementById("svgObject").contentDocument.getElementsByTagName('svg')[0];
+            mySVG.setAttribute("viewBox", [0, 0, mySVG.getAttribute("width"), mySVG.getAttribute("height")].join(" "));
+
+            mySVG.removeAttribute("width");
+            mySVG.removeAttribute("height");
+
+            refreshValues();
+        }
+        // Chama a funcao que realiza um GET no endpoint api/ProcessSimulator1.1/items e atualiza os elemento da pagina
+        setInterval(refreshValues, 500);
+
+        function refreshValues() {
+            // Realiza um GET no endpoint api/ProcessSimulator1.1/items e atualiza os elemento da pagina
+            var request = new XMLHttpRequest();
+            request.onreadystatechange = function() {
+                // Atualiza os elementos da pagina de acordo com o retorno do GET
+                if (request.readyState == 4 && request.status == 200)
+                    updateElements(JSON.parse(request.responseText))
+            }
+            // Realiza um GET no endpoint api/ProcessSimulator1.1/items
+            request.open("get", {{ url_for('api.get_items', server="ProcessSimulator1.1") | tojson }});
+            request.setRequestHeader('Content-Type', 'application/json', false);
+            request.send(null);
+        }
+
+        function updateElements(json_response) {
+            var switches_mapping = {
+                "Connection1.OUTB0_1": mySVG.getElementById("star1"),
+                "Connection1.OUTB0_2": mySVG.getElementById("star2"),
+                "Connection1.OUTB0_3": mySVG.getElementById("star3"),
+                "Connection1.OUTB0_4": mySVG.getElementById("delta1"),
+                "Connection1.OUTB0_5": mySVG.getElementById("delta2"),
+                "Connection1.OUTB0_6": mySVG.getElementById("delta3")
+            };
+            
+            // Atualiza a posicao dos switches de acordo com o valor dos itens Connection1.OUTB0_1 ao 
+            // Connection1.OUTB0_6
+            for (var key in switches_mapping){
+                if (json_response[key][0]){
+                    rotateSwitch(switches_mapping[key]);
+                } else{
+                    removeRotation(switches_mapping[key]);
+                }
+            }
+
+            // Atualiza o texto do botao de liga/desliga de acordo com o valor do item Connection1.INB0_0
+            setOnOffButtonText(json_response["Connection1.INB0_0"][0]);
+            // Atualiza o contador do timer de acordo com o valor do item Connection1.OUTW1
+            setTimerText(json_response["Connection1.OUTW1"][0]);
+            // Atualiza a cor do indicador de acordo com o valor do item Connection1.OUTB0_0
+            setProbeColor(json_response["Connection1.OUTB0_0"][0]);
+            // Atualiza o valor do relogio de acordo com o valor do item Connection1.OUTDW3
+            setClockText(json_response["Connection1.OUTDW3"][0]); 
+            // Atualiza o texto da caixa de texto "Valor do timer" de acordo com valor do item Connection1.MEMDW1
+            setTimerCurrentValue(json_response["Connection1.MEMDW1"][0])
+        }
+
+        function rotateSwitch(line) {
+            var origin = line.getAttribute("d").substring(2).split(" ", 1);
+            line.setAttribute("transform", `rotate(45 ${origin})`);
+        }
+
+        function removeRotation(line) {
+            line.setAttribute("transform", "");
+        }
+
+        function setOnOffButtonText(switch_value){
+            if (switch_value){
+                button.textContent = "Desligar";
+            } else {
+                button.textContent = "Ligar";
+            }
+        }
+
+        function setTimerText(timer_value){
+            var timer = document.getElementById("timer");
+            timer.textContent = `${timer_value/100}s`;
+        }
+
+        function setProbeColor(probe_value){
+            var on_off_probe = document.getElementById("on_off_probe");
+            if (probe_value){
+                on_off_probe.style.backgroundColor = "green";
+            } else{
+                on_off_probe.style.backgroundColor = "red";
+            }
+        }
+
+        function msToTime(ms) {
+            // Obtem o tempo no formato HH:MM:SS a partir do valor total em mili segundos
+            function pad(n) {
+                return ('00' + n).slice(-2);
+            }
+
+            var hrs = Math.trunc(ms / 3600000);
+            var mins_aux = ms % 3600000;
+            var mins = Math.trunc(mins_aux / 60000);
+            var secs_aux = mins_aux % 60000;
+            var secs = Math.trunc(secs_aux / 1000);
+
+            return pad(hrs) + ':' + pad(mins) + ':' + pad(secs)
+        }
+
+        function setClockText(clock_value){
+            var clock = document.getElementById("clock");
+            clock.textContent = `${msToTime(clock_value)}`;
+        }
+
+        function setTimerCurrentValue(timer_current_value){
+            timer_value = document.getElementById("timerValue");
+            update_button = document.getElementById("updateTimerButton");
+            
+            if (document.activeElement === timer_value || document.activeElement === update_button)
+                return
+
+            timer_value.value = timer_current_value / 1000;
+        }
+    </script>
+    </body>
+</html>

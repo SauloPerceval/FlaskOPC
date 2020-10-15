@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style type="text/css">
+            body {
+                font-family: "Courier New", sans-serif;
+                box-sizing: border-box;
+            }
+            .buttons {
+                font-size: 4em;
+            }
+            .dot {
+                height: 25px;
+                width: 25px;
+                background-color: #bbb;
+                border-radius: 50%;
+            }
+        </style>
+    </head>
+    <body>
+        <div style="align-items: center; justify-content: center;">
+            <div class="buttons" style="display: inline-block;">
+                <button id="on_off_button" type="button">Placeholder</button>
+            </div>
+            <span class="dot" id="on_off_probe" style="display: inline-block;"></span>
+            <div style="width:100px;height:50px;border:1px solid #000; margin-top: 10px; margin-right: 200px; float: right;">
+                <div style="border-bottom: double; text-align: center; font-weight: bold;";>Timer</div>
+                <div id= "timer" style="text-align: left;">Timer placeholder</div>
+            </div>
+        </div>
+        <div style="margin-left: 50px;">
+            <object id="svgObject" data="{{url_for('static', filename='star_delta.svg')}}" type="image/svg+xml"></object>
+        </div>
+    <script>
+        var button = document.getElementById("on_off_button");
+        var request = new XMLHttpRequest();
+
+        button.onclick = function(){
+            request.open("post", {{ url_for('star-delta.set_input')|tojson }});
+            request.setRequestHeader('Content-Type', 'application/json', false);
+            if (on_off_switch){
+                request.send(false);
+            } else{
+                request.send(true);
+            }
+        }
+
+        window.onload = function(){
+            var switches = JSON.parse({{ star_delta_switches | tojson }});
+            var timer = JSON.parse({{ timer | tojson }});
+            var on_off_probe = JSON.parse({{ on_off_probe | tojson }});
+
+            on_off_switch = JSON.parse({{ on_off_switch | tojson }});
+
+            mySVG = document.getElementById("svgObject").contentDocument;
+            mySVG.setAttribute("preserveAspectRatio", "xMinYMin meet");
+            mySVG.setAttribute("viewBox", [0, 0, svg.getAttribute("width"), svg.getAttribute("height")].join(" "));
+
+            svg.removeAttribute("width");
+            svg.removeAttribute("height");
+            for (var id in switches) {
+               if (switches[id]) {
+                   rotateSwitch(mySVG.getElementById(id));
+               }
+            }
+            setOnOffButtonText(on_off_switch);
+            setTimerText(timer);
+            setProbeColor(on_off_switch);
+        }
+
+        setInterval(refreshValues, 500);
+
+        function refreshValues() {
+            var request = new XMLHttpRequest();
+            request.onreadystatechange = function() {
+                if (request.readyState == 4 && request.status == 200)
+                    updateElements(JSON.parse(request.responseText))
+            }
+            request.open("get", {{ url_for('star-delta.get_all_values')|tojson }});
+            request.setRequestHeader('Content-Type', 'application/json', false);
+            request.send(null);
+        }
+
+        function updateElements(json_response) {
+            var switches_mapping = {
+                "Star_1": mySVG.getElementById("star1"),
+                "Star_2": mySVG.getElementById("star2"),
+                "Star_3": mySVG.getElementById("star3"),
+                "Delta_1": mySVG.getElementById("delta1"),
+                "Delta_2": mySVG.getElementById("delta2"),
+                "Delta_3": mySVG.getElementById("delta3")
+            };
+            on_off_switch = json_response["inputs"]["Starter"];
+
+            for (var key in switches_mapping){
+                if (json_response["outputs"][key]){
+                    rotateSwitch(switches_mapping[key]);
+                } else{
+                    removeRotation(switches_mapping[key]);
+                }
+            }
+
+            setOnOffButtonText(on_off_switch);
+            setTimerText(json_response["memory"]["Timer"]);
+            setProbeColor(json_response["outputs"]["On_Off"])
+        }
+
+        function rotateSwitch(line) {
+            var origin = line.getAttribute("d").substring(2).split(" ", 1);
+            line.setAttribute("transform", `rotate(45 ${origin})`);
+        }
+
+        function removeRotation(line) {
+            line.setAttribute("transform", "");
+        }
+
+        function setOnOffButtonText(switch_value){
+            if (switch_value){
+                button.textContent = "Desligar";
+            } else {
+                button.textContent = "Ligar";
+            }
+        }
+
+        function setTimerText(timer_value){
+            var timer = document.getElementById("timer");
+            timer.textContent = `${timer_value/100}s`;
+        }
+
+        function setProbeColor(probe_value){
+            var on_off_probe = document.getElementById("on_off_probe");
+            if (probe_value){
+                on_off_probe.style.backgroundColor = "green";
+            } else{
+                on_off_probe.style.backgroundColor = "red";
+            }
+        }
+    </script>
+    </body>
+</html>
