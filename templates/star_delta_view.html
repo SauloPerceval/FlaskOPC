@@ -127,9 +127,9 @@
             // Connection1.OUTB0_6
             for (var key in switches_mapping){
                 if (json_response[key][0]){
-                    rotateSwitch(switches_mapping[key]);
+                	removeRotation(switches_mapping[key]);
                 } else{
-                    removeRotation(switches_mapping[key]);
+                    rotateSwitch(switches_mapping[key]);
                 }
             }
 
