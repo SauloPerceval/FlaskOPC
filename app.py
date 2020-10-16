@@ -5,6 +5,7 @@ import OpenOPC
 def create_app():
     # Funcao responsavel por inicializar a aplicacao REST
     app = Flask(__name__)
+    app.threaded = False
     __register_blueprints(app)
     app.opc = OpenOPC.client()
 
