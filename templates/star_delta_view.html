@@ -68,6 +68,7 @@
             request.open("post", {{ url_for('api.post_items_value', server="ProcessSimulator1.1") | tojson }});
             request.setRequestHeader('Content-Type', 'application/json', false);
             // Atualiza o valor do item Connection1.INB0_0 por meio do POST
+            // A variavel on_off_switch e uma variavel global com o ultimo estado do item Connection1.INB0_0
             if (on_off_switch){
                 request.send(JSON.stringify({"Connection1.INB0_0": false}));
             } else{
@@ -132,9 +133,12 @@
                     rotateSwitch(switches_mapping[key]);
                 }
             }
+            
+            // Atribui o valor do item Connection1.INB0_0 a uma variavel global
+            on_off_switch = ["Connection1.INB0_0"][0];
 
             // Atualiza o texto do botao de liga/desliga de acordo com o valor do item Connection1.INB0_0
-            setOnOffButtonText(json_response["Connection1.INB0_0"][0]);
+            setOnOffButtonText(on_off_switch);
             // Atualiza o contador do timer de acordo com o valor do item Connection1.OUTW1
             setTimerText(json_response["Connection1.OUTW1"][0]);
             // Atualiza a cor do indicador de acordo com o valor do item Connection1.OUTB0_0
